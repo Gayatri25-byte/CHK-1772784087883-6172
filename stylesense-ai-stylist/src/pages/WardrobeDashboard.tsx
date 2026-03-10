@@ -1,25 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Plus, Sparkles, Filter, Grid3X3, LayoutList, ChevronDown } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
 import Navbar from "@/components/Navbar";
 import WardrobeItemCard from "@/components/wardrobe/WardrobeItemCard";
-import AISuggestionCard from "@/components/wardrobe/AISuggestionCard";
 import WardrobeStats from "@/components/wardrobe/WardrobeStats";
 import CategoryFilter, { type Category } from "@/components/wardrobe/CategoryFilter";
 
-import charcoalBlazer from "@/assets/clothing/charcoal-blazer.png";
-import ivoryBlouse from "@/assets/clothing/ivory-blouse.png";
-import creamTrousers from "@/assets/clothing/cream-trousers.png";
-import navySkirt from "@/assets/clothing/navy-skirt.png";
-import goldHeels from "@/assets/clothing/gold-heels.png";
-import whiteSneakers from "@/assets/clothing/white-sneakers.png";
-import pearlNecklace from "@/assets/clothing/pearl-necklace.png";
-import leatherTote from "@/assets/clothing/leather-tote.png";
-import cashmereSweater from "@/assets/clothing/cashmere-sweater.png";
-import blackJeans from "@/assets/clothing/black-jeans.png";
-import ankleBoots from "@/assets/clothing/ankle-boots.png";
-import silkScarf from "@/assets/clothing/silk-scarf.png";
+import { auth, db } from "@/firebase";
+import { collection, getDocs, addDoc } from "firebase/firestore";
 
+/* Categories */
 const categories = [
   { key: "all" as Category, label: "All Items", icon: "👗" },
   { key: "tops" as Category, label: "Tops", icon: "👕" },
@@ -28,127 +20,304 @@ const categories = [
   { key: "accessories" as Category, label: "Accessories", icon: "💍" },
 ];
 
-const wardrobeItems = [
-  { id: 1, name: "Charcoal Blazer", category: "tops" as const, image: charcoalBlazer, worn: 12, rating: 4.8 },
-  { id: 2, name: "Ivory Silk Blouse", category: "tops" as const, image: ivoryBlouse, worn: 8, rating: 4.5 },
-  { id: 3, name: "Cream Trousers", category: "bottoms" as const, image: creamTrousers, worn: 15, rating: 4.9 },
-  { id: 4, name: "Navy Midi Skirt", category: "bottoms" as const, image: navySkirt, worn: 6, rating: 4.2 },
-  { id: 5, name: "Gold Heels", category: "shoes" as const, image: goldHeels, worn: 4, rating: 4.7 },
-  { id: 6, name: "White Sneakers", category: "shoes" as const, image: whiteSneakers, worn: 20, rating: 4.6 },
-  { id: 7, name: "Pearl Necklace", category: "accessories" as const, image: pearlNecklace, worn: 10, rating: 5.0 },
-  { id: 8, name: "Leather Tote", category: "accessories" as const, image: leatherTote, worn: 18, rating: 4.8 },
-  { id: 9, name: "Cashmere Sweater", category: "tops" as const, image: cashmereSweater, worn: 9, rating: 4.4 },
-  { id: 10, name: "Black Jeans", category: "bottoms" as const, image: blackJeans, worn: 22, rating: 4.3 },
-  { id: 11, name: "Ankle Boots", category: "shoes" as const, image: ankleBoots, worn: 14, rating: 4.6 },
-  { id: 12, name: "Silk Scarf", category: "accessories" as const, image: silkScarf, worn: 7, rating: 4.9 },
-];
-
-const aiSuggestions = [
-  { outfit: "Charcoal Blazer + Cream Trousers + Gold Heels", score: 96, occasion: "Business Meeting", images: [charcoalBlazer, creamTrousers, goldHeels] },
-  { outfit: "Ivory Silk Blouse + Navy Midi Skirt + Ankle Boots", score: 91, occasion: "Date Night", images: [ivoryBlouse, navySkirt, ankleBoots] },
-  { outfit: "Cashmere Sweater + Black Jeans + White Sneakers", score: 88, occasion: "Weekend Brunch", images: [cashmereSweater, blackJeans, whiteSneakers] },
-];
-
-const wardrobeStats = [
-  { label: "Total Items", value: "12" },
-  { label: "Most Worn", value: "Black Jeans" },
-  { label: "Unused (30d)", value: "2 items" },
-  { label: "Style Score", value: "92%" },
-];
-
 const WardrobeDashboard = () => {
+
+  const navigate = useNavigate();
+
   const [activeCategory, setActiveCategory] = useState<Category>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [wardrobeItems, setWardrobeItems] = useState<any[]>([]);
 
-  const filteredItems = activeCategory === "all"
-    ? wardrobeItems
-    : wardrobeItems.filter((item) => item.category === activeCategory);
+  const [showForm, setShowForm] = useState(false);
+  const [itemName, setItemName] = useState("");
+  const [category, setCategory] = useState("tops");
+
+  const [image, setImage] = useState("");
+
+  /* THEME STATE */
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+
+  /* IMAGE UPLOAD */
+  const handleImageUpload = (e:any) => {
+
+    const file = e.target.files[0];
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      setImage(reader.result as string);
+    };
+
+    if(file){
+      reader.readAsDataURL(file);
+    }
+  };
+
+  /* LOAD WARDROBE */
+  const loadWardrobe = async () => {
+
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const snapshot = await getDocs(
+      collection(db, "users", user.uid, "wardrobe")
+    );
+
+    const items = snapshot.docs.map((doc, index) => {
+
+      const data:any = doc.data();
+
+      return {
+        id: index,
+        name: data.name,
+        category: data.category,
+        image: data.image,
+        worn: data.wearCount || 0,
+        rating: data.rating || 4
+      };
+
+    });
+
+    setWardrobeItems(items);
+  };
+
+  useEffect(() => {
+    loadWardrobe();
+  }, []);
+
+  /* ADD ITEM */
+  const addItem = async () => {
+
+    const user = auth.currentUser;
+
+    if (!user) {
+      alert("User not logged in");
+      return;
+    }
+
+    await addDoc(
+      collection(db, "users", user.uid, "wardrobe"),
+      {
+        name: itemName,
+        category: category,
+        image: image,
+        wearCount: 0,
+        rating: 4
+      }
+    );
+
+    setItemName("");
+    setImage("");
+    setShowForm(false);
+
+    loadWardrobe();
+  };
+
+  const filteredItems =
+    activeCategory === "all"
+      ? wardrobeItems
+      : wardrobeItems.filter((item) => item.category === activeCategory);
+
+  const wardrobeStats = [
+    { label: "Total Items", value: wardrobeItems.length },
+    { label: "Categories", value: new Set(wardrobeItems.map(i => i.category)).size },
+    { label: "Unused (30d)", value: "2 items" },
+    { label: "Style Score", value: "92%" },
+  ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={`min-h-screen ${theme === "dark" ? "bg-black text-white" : "bg-white text-black"}`}>
+
       <Navbar />
 
       <div className="pt-24 pb-16">
         <div className="container mx-auto px-6">
-          {/* Header */}
+
+          {/* HEADER */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10"
           >
+
             <div>
-              <h1 className="font-display text-4xl font-bold text-foreground mb-2">
-                Smart <span className="gradient-gold-text">Wardrobe</span>
+              <h1 className="font-display text-4xl font-bold mb-2">
+                Smart <span className="text-yellow-500">Wardrobe</span>
               </h1>
-              <p className="text-muted-foreground">
-                {wardrobeItems.length} items · {new Set(wardrobeItems.map(i => i.category)).size} categories
+
+              <p>
+                {wardrobeItems.length} items
               </p>
             </div>
+
             <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-secondary text-sm font-medium text-foreground hover:bg-muted transition-colors">
-                <Filter size={16} />
-                Filter
-                <ChevronDown size={14} />
-              </button>
-              <button className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity">
+
+              {/* FILTER DROPDOWN */}
+              <div className="relative">
+
+                <button
+                  onClick={() => setShowFilterMenu(!showFilterMenu)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium"
+                >
+                  <Filter size={16} />
+                  Theme
+                  <ChevronDown size={14} />
+                </button>
+
+                {showFilterMenu && (
+                  <div className="absolute right-0 mt-2 w-32 bg-white shadow-lg rounded-lg border p-2 z-10">
+
+                    <button
+                      onClick={() => {
+                        setTheme("light");
+                        setShowFilterMenu(false);
+                      }}
+                      className="block w-full text-left px-3 py-2 hover:bg-gray-100 rounded text-black"
+                    >
+                      Light
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setTheme("dark");
+                        setShowFilterMenu(false);
+                      }}
+                      className="block w-full text-left px-3 py-2 hover:bg-gray-100 rounded text-black"
+                    >
+                      Dark
+                    </button>
+
+                  </div>
+                )}
+
+              </div>
+
+              {/* ADD ITEM */}
+              <button
+                onClick={() => setShowForm(true)}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-yellow-500 text-white text-sm font-semibold"
+              >
                 <Plus size={16} />
                 Add Item
               </button>
+
             </div>
+
           </motion.div>
 
+          {/* ADD ITEM FORM */}
+          {showForm && (
+            <div className="p-6 mb-6 border rounded flex gap-3 flex-wrap">
+
+              <input
+                placeholder="Item Name"
+                value={itemName}
+                onChange={(e) => setItemName(e.target.value)}
+                className="border p-2 rounded"
+              />
+
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="border p-2 rounded"
+              >
+                <option value="tops">Top</option>
+                <option value="bottoms">Bottom</option>
+                <option value="shoes">Shoes</option>
+                <option value="accessories">Accessories</option>
+              </select>
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="border p-2 rounded"
+              />
+
+              <button
+                onClick={addItem}
+                className="bg-green-600 text-white px-4 py-2 rounded"
+              >
+                Save Item
+              </button>
+
+            </div>
+          )}
+
           <div className="grid lg:grid-cols-[1fr_340px] gap-8">
-            {/* Main Content */}
+
+            {/* WARDROBE */}
             <div>
+
               <CategoryFilter
                 categories={categories}
                 activeCategory={activeCategory}
                 onCategoryChange={setActiveCategory}
               />
 
-              {/* View Toggle */}
+              {/* VIEW MODE */}
               <div className="flex justify-end mb-4 gap-1">
+
                 <button
                   onClick={() => setViewMode("grid")}
-                  className={`p-2 rounded-lg transition-colors ${viewMode === "grid" ? "bg-accent/20 text-accent" : "text-muted-foreground"}`}
+                  className="p-2 rounded-lg"
                 >
                   <Grid3X3 size={18} />
                 </button>
+
                 <button
                   onClick={() => setViewMode("list")}
-                  className={`p-2 rounded-lg transition-colors ${viewMode === "list" ? "bg-accent/20 text-accent" : "text-muted-foreground"}`}
+                  className="p-2 rounded-lg"
                 >
                   <LayoutList size={18} />
                 </button>
+
               </div>
 
-              {/* Items Grid */}
+              {/* ITEMS */}
               <div className={viewMode === "grid" ? "grid grid-cols-2 md:grid-cols-3 gap-4" : "space-y-3"}>
+
                 {filteredItems.map((item, i) => (
-                  <WardrobeItemCard key={item.id} item={item} index={i} viewMode={viewMode} />
+                  <div key={i} onClick={() => navigate("/tryon", { state: item })}>
+                    <WardrobeItemCard
+                      item={item}
+                      index={i}
+                      viewMode={viewMode}
+                    />
+                  </div>
                 ))}
+
               </div>
+
             </div>
 
-            {/* AI Suggestions Sidebar */}
+            {/* SIDEBAR */}
             <div className="space-y-6">
-              <div className="glass-card p-6">
+
+              <div className="p-6 border rounded">
+
                 <div className="flex items-center gap-2 mb-5">
-                  <Sparkles size={18} className="text-accent" />
-                  <h3 className="font-display text-lg font-semibold text-foreground">AI Suggestions</h3>
+                  <Sparkles size={18} />
+                  <h3 className="text-lg font-semibold">
+                    AI Suggestions
+                  </h3>
                 </div>
-                <div className="space-y-4">
-                  {aiSuggestions.map((sug, i) => (
-                    <AISuggestionCard key={i} suggestion={sug} index={i} />
-                  ))}
-                </div>
+
+                <p className="text-sm">
+                  Suggestions will appear after wardrobe data loads.
+                </p>
+
               </div>
 
               <WardrobeStats stats={wardrobeStats} />
+
             </div>
+
           </div>
+
         </div>
       </div>
+
     </div>
   );
 };
