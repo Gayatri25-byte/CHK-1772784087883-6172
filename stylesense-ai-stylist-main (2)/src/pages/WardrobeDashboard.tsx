@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Plus, Sparkles, Filter, Grid3X3, LayoutList, ChevronDown } from "lucide-react";
@@ -31,12 +32,12 @@ const WardrobeDashboard = () => {
   const [showForm, setShowForm] = useState(false);
   const [itemName, setItemName] = useState("");
   const [category, setCategory] = useState("tops");
-
   const [image, setImage] = useState("");
 
-  /* THEME STATE */
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+
+  const [aiSuggestion, setAiSuggestion] = useState<any[]>([]);
 
   /* IMAGE UPLOAD */
   const handleImageUpload = (e:any) => {
@@ -81,9 +82,36 @@ const WardrobeDashboard = () => {
     setWardrobeItems(items);
   };
 
+  /* AI SUGGESTION */
+  const generateAISuggestion = () => {
+
+    const tops = wardrobeItems.filter(i => i.category === "tops");
+    const bottoms = wardrobeItems.filter(i => i.category === "bottoms");
+    const shoes = wardrobeItems.filter(i => i.category === "shoes");
+    const accessories = wardrobeItems.filter(i => i.category === "accessories");
+
+    if (!tops.length || !bottoms.length || !shoes.length) return;
+
+    const outfit = [
+      tops[Math.floor(Math.random() * tops.length)],
+      bottoms[Math.floor(Math.random() * bottoms.length)],
+      shoes[Math.floor(Math.random() * shoes.length)],
+      accessories[Math.floor(Math.random() * accessories.length)] || null
+    ].filter(Boolean);
+
+    setAiSuggestion(outfit);
+
+  };
+
   useEffect(() => {
     loadWardrobe();
   }, []);
+
+  useEffect(() => {
+    if (wardrobeItems.length) {
+      generateAISuggestion();
+    }
+  }, [wardrobeItems]);
 
   /* ADD ITEM */
   const addItem = async () => {
@@ -152,7 +180,7 @@ const WardrobeDashboard = () => {
 
             <div className="flex items-center gap-3">
 
-              {/* FILTER DROPDOWN */}
+              {/* THEME FILTER */}
               <div className="relative">
 
                 <button
@@ -255,7 +283,6 @@ const WardrobeDashboard = () => {
                 onCategoryChange={setActiveCategory}
               />
 
-              {/* VIEW MODE */}
               <div className="flex justify-end mb-4 gap-1">
 
                 <button
@@ -274,7 +301,6 @@ const WardrobeDashboard = () => {
 
               </div>
 
-              {/* ITEMS */}
               <div className={viewMode === "grid" ? "grid grid-cols-2 md:grid-cols-3 gap-4" : "space-y-3"}>
 
                 {filteredItems.map((item, i) => (
@@ -303,9 +329,36 @@ const WardrobeDashboard = () => {
                   </h3>
                 </div>
 
-                <p className="text-sm">
-                  Suggestions will appear after wardrobe data loads.
-                </p>
+                {aiSuggestion.length === 0 ? (
+
+                  <p className="text-sm">
+                    Add more clothes to generate outfit suggestions.
+                  </p>
+
+                ) : (
+
+                  <div className="grid grid-cols-2 gap-3">
+
+                    {aiSuggestion.map((item, index) => (
+
+                      <div key={index} className="border rounded-lg p-2 text-center">
+
+                        <img
+                          src={item.image}
+                          className="rounded mb-2"
+                        />
+
+                        <p className="text-xs font-medium">
+                          {item.name}
+                        </p>
+
+                      </div>
+
+                    ))}
+
+                  </div>
+
+                )}
 
               </div>
 

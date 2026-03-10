@@ -4,6 +4,8 @@ import { auth } from "../../firebase.ts";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import SocialLoginButtons from "../login/SocialLoginButtons.tsx";
+import { db } from "../../firebase";
+import { doc, setDoc } from "firebase/firestore";
 
 const SignupForm = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -15,9 +17,26 @@ const SignupForm = () => {
     e.preventDefault();
 
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      // 1️⃣ Create user in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      const user = userCredential.user;
+
+      // 2️⃣ Automatically create user document in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        email: user.email,
+        createdAt: new Date()
+      });
+
       alert("Account created successfully!");
-      navigate("/"); // Redirect to main page after successful signup
+
+      // 3️⃣ Redirect user
+      navigate("/");
+
     } catch (error: any) {
       alert(error.message);
     }
@@ -33,7 +52,8 @@ const SignupForm = () => {
           StyleSense
         </h1>
         <p className="text-muted-foreground text-sm mt-2">
-          Your AI Personal Stylist. Curated outfits, intelligent wardrobe management, and fashion-forward recommendations.
+          Your AI Personal Stylist. Curated outfits, intelligent wardrobe
+          management, and fashion-forward recommendations.
         </p>
       </div>
 
@@ -85,7 +105,9 @@ const SignupForm = () => {
 
       <div className="my-6 flex items-center gap-4">
         <div className="flex-1 h-px bg-border" />
-        <span className="text-xs text-muted-foreground">or continue with</span>
+        <span className="text-xs text-muted-foreground">
+          or continue with
+        </span>
         <div className="flex-1 h-px bg-border" />
       </div>
 
