@@ -1,25 +1,42 @@
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom"; // Added useNavigate
+import { Link, useNavigate } from "react-router-dom";
 import SocialLoginButtons from "./SocialLoginButtons";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../../firebase";
 
 const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const navigate = useNavigate(); // Initialize navigation
+  const navigate = useNavigate();
 
-  // --- ADDED THIS FUNCTION ---
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Basic validation check
-    if (email && password) {
-      console.log("Logging in with:", email, password);
-      // For now, let's redirect to the main page/dashboard
-      navigate("/"); 
-    } else {
-      alert("Please enter both email and password");
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      const user = userCredential.user;
+      console.log("Login successful:", user);
+
+      alert("Login successful");
+
+      navigate("/");
+    } catch (error: any) {
+      console.error(error);
+
+      if (error.code === "auth/user-not-found") {
+        alert("User not found");
+      } else if (error.code === "auth/wrong-password") {
+        alert("Wrong password");
+      } else {
+        alert("Login failed");
+      }
     }
   };
 
@@ -32,7 +49,6 @@ const LoginForm = () => {
         Enter your credentials to access your wardrobe
       </p>
 
-      {/* --- CHANGED onSubmit HERE --- */}
       <form className="space-y-5" onSubmit={handleLogin}>
         <div>
           <label className="text-sm font-medium text-foreground mb-1.5 block">

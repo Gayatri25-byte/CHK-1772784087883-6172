@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Sun, MapPin, Calendar } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -61,15 +61,48 @@ const generatedOutfits = [
 ];
 
 const OutfitGenerator = () => {
+  const API_KEY = "YOUR_OPENWEATHER_API_KEY";
+
   const [selectedOccasion, setSelectedOccasion] = useState("");
   const [selectedWeather, setSelectedWeather] = useState("");
   const [selectedStyle, setSelectedStyle] = useState("");
   const [generated, setGenerated] = useState(false);
   const [activeOutfit, setActiveOutfit] = useState(0);
 
+const getWeatherFromLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation not supported");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+
+      const res = await fetch(
+        `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`
+      );
+
+      const data = await res.json();
+
+      const weatherMain = data.weather[0].main;
+      const temp = data.main.temp;
+
+      let weatherOption = "";
+
+      if (weatherMain === "Rain") weatherOption = "🌧 Rainy";
+      else if (temp < 10) weatherOption = "❄️ Cold";
+      else if (temp > 30) weatherOption = "🌡 Hot & Humid";
+      else if (weatherMain === "Clear") weatherOption = "☀️ Sunny";
+      else weatherOption = "🌤 Partly Cloudy";
+
+      setSelectedWeather(weatherOption);
+    });
+  };
+
   const handleGenerate = () => {
     setGenerated(true);
-    setActiveOutfit(0);
+    setActiveOutfit(0)
   };
 
   return (
@@ -97,26 +130,103 @@ const OutfitGenerator = () => {
 
           <div className="max-w-4xl mx-auto">
             {/* Inputs */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="glass-card p-8 mb-8"
-            >
-              <ChipSelector label="Occasion" icon={Calendar} options={occasions} selected={selectedOccasion} onSelect={setSelectedOccasion} />
-              <ChipSelector label="Weather" icon={Sun} options={weathers} selected={selectedWeather} onSelect={setSelectedWeather} />
-              <div className="mb-8">
-                <ChipSelector label="Personal Style" icon={MapPin} options={styles} selected={selectedStyle} onSelect={setSelectedStyle} />
-              </div>
+           <motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ delay: 0.1 }}
+  className="glass-card p-8 mb-8"
+>
 
-              <button
-                onClick={handleGenerate}
-                className="w-full py-4 rounded-xl gradient-gold text-primary-foreground font-semibold text-sm tracking-wide hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-              >
-                <Sparkles size={18} />
-                Generate Outfit
-              </button>
-            </motion.div>
+  {/* Occasion */}
+  <ChipSelector
+    label="Occasion"
+    icon={Calendar}
+    options={occasions}
+    selected={selectedOccasion}
+    onSelect={setSelectedOccasion}
+  />
+
+  {/* WEATHER SECTION */}
+  <div className="mb-6">
+
+    <div className="flex justify-between items-center mb-3">
+
+      <span className="text-sm font-medium flex items-center gap-2">
+        <Sun size={16} />
+        Weather
+      </span>
+
+      <div className="flex gap-3">
+
+        <button
+          onClick={() => {
+            const city = prompt("Enter your city name");
+            if (!city) return;
+
+            fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`)
+              .then(res => res.json())
+              .then(data => {
+                const weatherMain = data.weather[0].main;
+                const temp = data.main.temp;
+
+                let weatherOption = "";
+
+                if (weatherMain === "Rain") weatherOption = "🌧 Rainy";
+                else if (temp < 10) weatherOption = "❄️ Cold";
+                else if (temp > 30) weatherOption = "🌡 Hot & Humid";
+                else if (weatherMain === "Clear") weatherOption = "☀️ Sunny";
+                else weatherOption = "🌤 Partly Cloudy";
+
+                setSelectedWeather(weatherOption);
+              });
+          }}
+          className="text-xs flex items-center gap-1 text-accent hover:underline"
+        >
+          📍 Choose Location
+        </button>
+
+        <button
+          onClick={getWeatherFromLocation}
+          className="text-xs flex items-center gap-1 text-accent hover:underline"
+        >
+          <MapPin size={14} />
+          Use Current Location
+        </button>
+
+      </div>
+
+    </div>
+
+    <ChipSelector
+      label=""
+      icon={Sun}
+      options={weathers}
+      selected={selectedWeather}
+      onSelect={setSelectedWeather}
+    />
+
+  </div>
+
+  {/* Personal Style */}
+  <div className="mb-8">
+    <ChipSelector
+      label="Personal Style"
+      icon={MapPin}
+      options={styles}
+      selected={selectedStyle}
+      onSelect={setSelectedStyle}
+    />
+  </div>
+
+  <button
+    onClick={handleGenerate}
+    className="w-full py-4 rounded-xl gradient-gold text-primary-foreground font-semibold text-sm tracking-wide hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+  >
+    <Sparkles size={18} />
+    Generate Outfit
+  </button>
+
+</motion.div>
 
             {/* Results */}
             <AnimatePresence>
